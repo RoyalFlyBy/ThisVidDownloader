@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    env:
+      MODULE: github.com/RoyalFlyBy/ThisVidDownloader
+      GOPRIVATE: github.com/RoyalFlyBy/*
+      GONOSUMDB: github.com/RoyalFlyBy/*
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure private modules
+        run: git config --global url."https://oauth:${{ secrets.GIT_AUTH }}@github.com/".insteadOf "https://github.com/"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Set env
+        run: |
+          echo "APP_VERSION=${GITHUB_REF##*/}" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          EXT=""
+          [ "$GOOS" = "windows" ] && EXT=".exe"
+          CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X '$MODULE.AppVersion=$APP_VERSION' -X '$MODULE.GitCommit=$GITHUB_SHA' -X '$MODULE.GitRef=$GITHUB_REF' -X '$MODULE.BuildTime=$BUILD_TIME'" \
+            -o "thisvid_downloader${EXT}" ./_bin
+      - name: Package
+        run: |
+          ASSET="thisvid_downloader-${APP_VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          EXT=""
+          [ "${{ matrix.goos }}" = "windows" ] && EXT=".exe"
+          mkdir -p "$ASSET"
+          mv "thisvid_downloader${EXT}" "$ASSET/"
+          cp README.md "$ASSET/" 2>/dev/null || true
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip -r "${ASSET}.zip" "$ASSET"
+            md5sum "${ASSET}.zip" > "${ASSET}.zip.md5"
+            echo "ASSET_PATH=${ASSET}.zip" >> "$GITHUB_ENV"
+            echo "MD5_PATH=${ASSET}.zip.md5" >> "$GITHUB_ENV"
+          else
+            tar -czf "${ASSET}.tar.gz" "$ASSET"
+            md5sum "${ASSET}.tar.gz" > "${ASSET}.tar.gz.md5"
+            echo "ASSET_PATH=${ASSET}.tar.gz" >> "$GITHUB_ENV"
+            echo "MD5_PATH=${ASSET}.tar.gz.md5" >> "$GITHUB_ENV"
+          fi
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ASSET_PATH }}
+            ${{ env.MD5_PATH }}
