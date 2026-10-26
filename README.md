@@ -4,17 +4,16 @@ A bunny-style ThisVid downloader built on [go-thisvid](https://github.com/RoyalF
 It resolves a video page through the player's license wrapper, asks the CDN for the file size with a one-byte range, then downloads the stream with ranged, resumable threads.
 
 ## Install
-```sh
-go install github.com/RoyalFlyBy/ThisVidDownloader/_bin@latest
-```
 `go-thisvid` and `go-browser-util` are private modules, so set `GOPRIVATE=github.com/RoyalFlyBy/*` and have git credentials before building.
 
-Or build a binary:
 ```sh
+git clone https://github.com/RoyalFlyBy/ThisVidDownloader && cd ThisVidDownloader
 go build -o thisvid_downloader ./_bin
-# cross-compile everything into _bin/:
+# or cross-compile everything into _bin/:
 _resources/scripts/build.sh
 ```
+
+Release binaries are attached to each [release](https://github.com/RoyalFlyBy/ThisVidDownloader/releases).
 
 ## Usage
 
